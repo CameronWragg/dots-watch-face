@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Generate the Glyphs font: the face's dots and 16 x 16 icons as one BMFont.
+"""Generate source/Icons.mc: the face's 16 x 16 icons as lists of rectangles.
 
-Connect IQ tints custom font glyphs with the current foreground colour, so every
-dot and icon can be drawn in any segment colour with drawText.
+Each icon is drawn with dc.fillRectangle in the current colour, so setColor tints
+it and every pixel lands exactly where it is placed, with no font metrics involved.
 
-    python3 tools/make_glyphs.py            # writes resources/fonts/glyphs.{fnt,png}
-    python3 tools/make_glyphs.py --preview out.png   # also an 8x preview sheet
+    python3 tools/make_icons.py                      # writes source/Icons.mc
+    python3 tools/make_icons.py --preview out.png    # also an 8x preview sheet
 
 Icons are described as signed distance functions on a 16 x 16 grid, stroked,
 supersampled and thresholded to 1 bit, since the display has no alpha blending.
@@ -153,33 +153,23 @@ def zigzag(x, y):
 
 ICONS = {
     # Ring segments, in segment order
-    'a': union(stroke(rbox(1.0, 4.0, 11.0, 12.0, 1.0)), rbox(13.0, 6.0, 15.0, 10.0, 0.1)),  # battery
-    'b': stroke(union(circle(5.3, 6.2, 3.3), circle(10.7, 6.2, 3.3),
+    'BATTERY': union(stroke(rbox(1.0, 4.0, 11.0, 12.0, 1.0)), rbox(13.0, 6.0, 15.0, 10.0, 0.1)),  # battery
+    'HEART': stroke(union(circle(5.3, 6.2, 3.3), circle(10.7, 6.2, 3.3),
                       polygon([(2.25, 7.6), (8, 13.9), (13.75, 7.6), (8, 6)]))),  # heart
-    'c': union(stroke(ellipse(4.6, 5.6, 2.3, 3.7)), stroke(ellipse(11.4, 10.4, 2.3, 3.7))),  # footprints
-    'd': sun_shape(),  # sun (solar intensity, and clear weather)
-    'e': bolt(),  # Body Battery
-    'f': union(line(arc(8, 11.5, 6.3, 270, 90)), capsule(8, 11.5, 10.8, 7.3, STROKE / 2)),  # gauge
+    'FOOTPRINTS': union(stroke(ellipse(4.6, 5.6, 2.3, 3.7)), stroke(ellipse(11.4, 10.4, 2.3, 3.7))),  # footprints
+    'SUN': sun_shape(),  # sun (solar intensity, and clear weather)
+    'BOLT': bolt(),  # Body Battery
+    'GAUGE': union(line(arc(8, 11.5, 6.3, 270, 90)), capsule(8, 11.5, 10.8, 7.3, STROKE / 2)),  # gauge
     # Weather conditions
-    'g': union(minus(partial_sun(), lambda x, y: translate(scale(cloud_fill(), 0.75), 2.4, 2.2)(x, y) - 1.3),
+    'PARTLY_CLOUDY': union(minus(partial_sun(), lambda x, y: translate(scale(cloud_fill(), 0.75), 2.4, 2.2)(x, y) - 1.3),
                translate(scale(cloud(), 0.75), 2.4, 2.2)),  # partly cloudy
-    'h': cloud(),  # cloudy
-    'i': union(small_cloud(), *[capsule(x, y, x, y + 2, 0.6) for x, y in ((5.5, 12), (8.5, 13), (11.5, 12))]),  # rain
-    'j': union(small_cloud(), *[rbox(x - 1, y - 1, x + 1, y + 1, 0.1) for x, y in ((5, 13), (8, 15), (11, 13))]),  # snow
-    'k': union(minus(small_cloud(), lambda x, y: zigzag(x, y) - 1.6), line(zigzag, 1.2)),  # thunderstorm
-    'l': union(capsule(2, 5, 14, 5, STROKE / 2), capsule(4, 8.5, 12, 8.5, STROKE / 2),
+    'CLOUDY': cloud(),  # cloudy
+    'RAIN': union(small_cloud(), *[capsule(x, y, x, y + 2, 0.6) for x, y in ((5.5, 12), (8.5, 13), (11.5, 12))]),  # rain
+    'SNOW': union(small_cloud(), *[rbox(x - 1, y - 1, x + 1, y + 1, 0.1) for x, y in ((5, 13), (8, 15), (11, 13))]),  # snow
+    'THUNDERSTORM': union(minus(small_cloud(), lambda x, y: zigzag(x, y) - 1.6), line(zigzag, 1.2)),  # thunderstorm
+    'FOG': union(capsule(2, 5, 14, 5, STROKE / 2), capsule(4, 8.5, 12, 8.5, STROKE / 2),
                capsule(2, 12, 14, 12, STROKE / 2)),  # fog
 }
-
-# Dots, drawn exactly rather than from distance functions.
-DOTS = {
-    '0': ['.####.', '######', '######', '######', '######', '.####.'],  # 6 px: ring lit, time
-    '2': ['###', '###', '###'],  # 3 px: date and weather
-    '4': ['.##.', '####', '####', '.##.'],  # 4 px: ring unlit
-}
-# Characters that only advance: empty cells in a row of dots.
-ADVANCE = {'0': 8, '1': 8, '2': 4, '3': 4, '4': 4}
-
 
 def rasterise(f):
     rows = []
@@ -209,51 +199,89 @@ def write_png(path, width, height, rgba_rows):
         f.write(png)
 
 
+def rectangles(rows):
+    """Covers an icon's pixels with rectangles: runs of pixels in a row, each merged
+    with identical runs directly below it."""
+    done, open_, rects = [], {}, []
+    for y, row in enumerate(rows + ['.' * ICON]):
+        runs, x = [], 0
+        while x < ICON:
+            if row[x] == '#':
+                w = 1
+                while x + w < ICON and row[x + w] == '#':
+                    w += 1
+                runs.append((x, w))
+                x += w
+            else:
+                x += 1
+        still_open = {}
+        for run in runs:
+            if run in open_:
+                still_open[run] = open_.pop(run)
+            else:
+                still_open[run] = y
+        for (x, w), top in open_.items():
+            rects.append((x, top, w, y - top))
+        open_ = still_open
+    return sorted(rects, key=lambda r: (r[1], r[0]))
+
+
+TEMPLATE = """// Generated by tools/make_icons.py: edit the icons there, then regenerate.
+import Toybox.Graphics;
+import Toybox.Lang;
+
+// The face's 16 x 16 icons, each a list of rectangles filled in the current colour.
+module Icons {{
+
+    const SIZE = {size};
+
+    // Ring segments, in segment order, then weather conditions.
+{names}
+
+    // Start of each icon's rectangles in RECTS, then the end of the last icon's.
+    const STARTS = [{starts}] as Array<Number>;
+
+    // One rectangle per entry: x | y << 4 | (width - 1) << 8 | (height - 1) << 12.
+    const RECTS = [
+{rects}
+    ] as Array<Number>;
+
+    // Draws an icon in the current colour with its top-left pixel at (left, top).
+    function draw(dc as Graphics.Dc, icon as Number, left as Number, top as Number) as Void {{
+        for (var i = STARTS[icon]; i < STARTS[icon + 1]; i++) {{
+            var r = RECTS[i];
+            dc.fillRectangle(left + (r & 15), top + (r >> 4 & 15), (r >> 8 & 15) + 1, (r >> 12) + 1);
+        }}
+    }}
+}}
+"""
+
+
 def main():
     root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-    out = os.path.join(root, 'resources', 'fonts')
+    icons = [(c, rasterise(f)) for c, f in ICONS.items()]
 
-    glyphs = []  # (char, rows, xadvance)
-    for c, rows in DOTS.items():
-        glyphs.append((c, rows, ADVANCE[c]))
-    for c in ('1', '3'):
-        glyphs.append((c, ['.'], ADVANCE[c]))
-    for c, f in ICONS.items():
-        glyphs.append((c, rasterise(f), ICON))
+    names, starts, lines, n = [], [], [], 0
+    for i, (c, rows) in enumerate(icons):
+        rects = rectangles(rows)
+        names.append('    const %s = %d;' % (c, i))
+        starts.append(n)
+        packed = ['0x%04x' % (x | y << 4 | (w - 1) << 8 | (h - 1) << 12) for x, y, w, h in rects]
+        for k in range(0, len(packed), 10):
+            lines.append('        ' + ', '.join(packed[k:k + 10]) + ',' + ('  // ' + c.lower() if k == 0 else ''))
+        n += len(rects)
+    starts.append(n)
 
-    # Pack left to right with a 1 px gap.
-    width = sum(len(g[1][0]) + 1 for g in glyphs)
-    height = ICON
-    pixels = [[0] * (width * 4) for _ in range(height)]
-    chars = []
-    x = 0
-    for c, rows, adv in sorted(glyphs, key=lambda g: g[0]):
-        w, h = len(rows[0]), len(rows)
-        for yy, row in enumerate(rows):
-            for xx, p in enumerate(row):
-                if p == '#':
-                    pixels[yy][(x + xx) * 4:(x + xx) * 4 + 4] = [255, 255, 255, 255]
-        chars.append('char id=%-4d x=%-4d y=0 width=%-3d height=%-3d xoffset=0 yoffset=0 xadvance=%-3d page=0 chnl=15'
-                     % (ord(c), x, w, h, adv))
-        x += w + 1
-
-    write_png(os.path.join(out, 'glyphs.png'), width, height, pixels)
-    fnt = ['info face="Glyphs" size=%d bold=0 italic=0 charset="" unicode=1 stretchH=100 smooth=0 aa=1 '
-           'padding=0,0,0,0 spacing=1,1 outline=0' % ICON,
-           'common lineHeight=%d base=%d scaleW=%d scaleH=%d pages=1 packed=0 alphaChnl=1 redChnl=0 '
-           'greenChnl=0 blueChnl=0' % (ICON, ICON, width, height),
-           'page id=0 file="glyphs.png"',
-           'chars count=%d' % len(chars)] + chars
-    with open(os.path.join(out, 'glyphs.fnt'), 'w') as f:
-        f.write('\n'.join(fnt) + '\n')
+    with open(os.path.join(root, 'source', 'Icons.mc'), 'w') as f:
+        f.write(TEMPLATE.format(size=ICON, names='\n'.join(names), starts=', '.join(map(str, starts)),
+                                rects='\n'.join(lines)))
 
     if '--preview' in sys.argv:
         # 8x sheet of the icons, grey grid lines between pixels.
-        icons = [g for g in sorted(glyphs) if g[0] in ICONS]
         s, cell = 8, ICON * 8 + 8
         pw, ph = cell * len(icons), cell
         rows = [[40] * (pw * 4) for _ in range(ph)]
-        for i, (c, rr, _) in enumerate(icons):
+        for i, (c, rr) in enumerate(icons):
             for py in range(ICON * s):
                 for px in range(ICON * s):
                     on = rr[py // s][px // s] == '#'

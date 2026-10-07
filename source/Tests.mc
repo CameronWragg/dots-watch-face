@@ -1,4 +1,5 @@
 import Toybox.Lang;
+import Toybox.Math;
 import Toybox.Test;
 
 // Unit tests, excluded from normal builds. Run with:
@@ -20,10 +21,50 @@ function ringHas78DotsInsideTheDisplay(logger as Logger) as Boolean {
     var dots = Ring.positions(130, 130);
     Test.assertEqual(dots.size(), 156);
     // Segment 0's first dot is 24 degrees before 12 o'clock.
-    Test.assertEqual(dots[0], 80);
-    Test.assertEqual(dots[1], 19);
+    Test.assertEqual(dots[0], 81);
+    Test.assertEqual(dots[1], 18);
     for (var i = 0; i < dots.size(); i++) {
         Test.assert(dots[i] >= 3 && dots[i] <= 257);
+    }
+    return true;
+}
+
+(:test)
+function ringDotsAllSitOnTheCircle(logger as Logger) as Boolean {
+    var dots = Ring.positions(130, 130);
+    for (var i = 0; i < dots.size(); i += 2) {
+        var dx = dots[i] - 130;
+        var dy = dots[i + 1] - 130;
+        var r = Math.sqrt(dx * dx + dy * dy);
+        Test.assert(r > Ring.RADIUS - 0.45 && r < Ring.RADIUS + 0.45);
+    }
+    return true;
+}
+
+(:test)
+function ringDotsAreEvenlySpaced(logger as Logger) as Boolean {
+    var dots = Ring.positions(130, 130);
+    // 4 degrees of arc on a 122 px circle: 2 x 122 x sin(2 degrees) = 8.51 px.
+    for (var s = 0; s < Ring.SEGMENTS; s++) {
+        for (var d = 0; d < Ring.DOTS_PER_SEGMENT - 1; d++) {
+            var k = 2 * (s * Ring.DOTS_PER_SEGMENT + d);
+            var dx = dots[k + 2] - dots[k];
+            var dy = dots[k + 3] - dots[k + 1];
+            var gap = Math.sqrt(dx * dx + dy * dy);
+            Test.assert(gap > 8.01 && gap < 9.01);
+        }
+    }
+    return true;
+}
+
+(:test)
+function iconRectanglesStayInside16By16(logger as Logger) as Boolean {
+    Test.assertEqual(Icons.STARTS.size(), Icons.FOG + 2);
+    Test.assertEqual(Icons.STARTS[Icons.STARTS.size() - 1], Icons.RECTS.size());
+    for (var i = 0; i < Icons.RECTS.size(); i++) {
+        var r = Icons.RECTS[i];
+        Test.assert((r & 15) + (r >> 8 & 15) + 1 <= Icons.SIZE);
+        Test.assert((r >> 4 & 15) + (r >> 12) + 1 <= Icons.SIZE);
     }
     return true;
 }

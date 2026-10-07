@@ -35,9 +35,18 @@ monkeyc -f monkey.jungle -d fenix8solar47mm -o bin/test.prg -y ~/.Garmin/develop
 monkeydo bin/test.prg fenix8solar47mm -t
 ```
 
-The dots and icons are one generated bitmap font, so `setColor` can tint them. Edit the icons in
-`tools/make_glyphs.py`, then regenerate `resources/fonts/glyphs.{fnt,png}`:
+Every dot and icon is drawn with `fillRectangle`, so `setColor` tints it and each pixel lands exactly
+where it is placed. The icons are generated rectangle lists: edit them in `tools/make_icons.py`, then
+regenerate `source/Icons.mc`:
 
 ```sh
-python3 tools/make_glyphs.py --preview /tmp/icons.png
+python3 tools/make_icons.py --preview /tmp/icons.png
+```
+
+The ring's dot positions are snapped to whole pixels so that the gaps between dots, and their
+distance from the edge, stay even. They're generated into `source/RingOffsets.mc`; after changing
+the ring geometry, regenerate them:
+
+```sh
+python3 tools/make_ring.py
 ```

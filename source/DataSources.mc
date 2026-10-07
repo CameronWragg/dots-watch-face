@@ -8,7 +8,7 @@ import Toybox.UserProfile;
 import Toybox.Weather;
 
 // One function per ring segment. Each returns a fraction from 0 to 1, or null when
-// the value is unavailable.
+// the value is unavailable. segments() reads the system once for all six.
 module DataSources {
 
     const DEFAULT_RESTING_HR = 50;
@@ -16,21 +16,20 @@ module DataSources {
     // timeToRecovery is in hours (the RECOVERY_TIME complication would be minutes).
     const RECOVERY_CAP_HOURS = 96;
 
-    // The fraction for ring segment 0..5, in Ring.COLOURS order.
-    function forSegment(segment as Number) as Float? {
-        switch (segment) {
-            case 0: return battery();
-            case 1: return heartRate();
-            case 2: return steps();
-            case 3: return solarIntensity();
-            case 4: return bodyBattery();
-            case 5: return recovery();
-        }
-        return null;
+    // Resting and maximum heart rate, read from the user profile by
+    // refreshHeartRateRange() rather than on every update.
+    var _hrRange as [Number, Number]? = null;
+
+    // The six ring fractions, in Ring.COLOURS order, sharing one read of each system API.
+    function segments() as Array<Float?> {
+        var stats = System.getSystemStats();
+        var info = ActivityMonitor.getInfo();
+        return [battery(stats), heartRate(), steps(info), solarIntensity(stats), bodyBattery(), recovery(info)]
+            as Array<Float?>;
     }
 
-    function battery() as Float? {
-        return clamp(System.getSystemStats().battery / 100.0);
+    function battery(stats as System.Stats) as Float? {
+        return clamp(stats.battery / 100.0);
     }
 
     // Current heart rate between resting (empty) and maximum (full).
@@ -49,7 +48,16 @@ module DataSources {
         if (hr == null) {
             return null;
         }
+        if (_hrRange == null) {
+            refreshHeartRateRange();
+        }
+        var range = _hrRange as [Number, Number];
+        return clamp((hr - range[0]).toFloat() / (range[1] - range[0]));
+    }
 
+    // Rereads resting and maximum heart rate from the user profile. They change at
+    // most daily, so the view calls this once an hour.
+    function refreshHeartRateRange() as Void {
         var profile = UserProfile.getProfile();
         var resting = profile.restingHeartRate;
         if (resting == null) {
@@ -62,11 +70,10 @@ module DataSources {
             resting = DEFAULT_RESTING_HR;
             max = DEFAULT_MAX_HR;
         }
-        return clamp((hr - resting).toFloat() / (max - resting));
+        _hrRange = [resting, max];
     }
 
-    function steps() as Float? {
-        var info = ActivityMonitor.getInfo();
+    function steps(info as ActivityMonitor.Info) as Float? {
         var count = info.steps;
         var goal = info.stepGoal;
         if (count == null || goal == null || goal <= 0) {
@@ -76,8 +83,8 @@ module DataSources {
     }
 
     // Negative while the watch is not charging from the sun, which shows as empty.
-    function solarIntensity() as Float? {
-        var solar = System.getSystemStats().solarIntensity;
+    function solarIntensity(stats as System.Stats) as Float? {
+        var solar = stats.solarIntensity;
         if (solar == null) {
             return null;
         }
@@ -95,8 +102,8 @@ module DataSources {
     }
 
     // Fills in reverse, so a fuller bar means more ready.
-    function recovery() as Float? {
-        var hours = ActivityMonitor.getInfo().timeToRecovery;
+    function recovery(info as ActivityMonitor.Info) as Float? {
+        var hours = info.timeToRecovery;
         if (hours == null) {
             return null;
         }
@@ -104,8 +111,7 @@ module DataSources {
     }
 
     // Current temperature as a whole number in the watch's unit, or null.
-    function temperature() as Number? {
-        var conditions = Weather.getCurrentConditions();
+    function temperature(conditions as Weather.CurrentConditions?) as Number? {
         var celsius = conditions != null ? conditions.temperature : null;
         if (celsius == null) {
             return null;
@@ -120,8 +126,7 @@ module DataSources {
     }
 
     // Weather.CONDITION_* code for the current weather, or null.
-    function weatherCondition() as Number? {
-        var conditions = Weather.getCurrentConditions();
+    function weatherCondition(conditions as Weather.CurrentConditions?) as Number? {
         return conditions != null ? conditions.condition : null;
     }
 
