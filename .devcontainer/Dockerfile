@@ -45,7 +45,9 @@ RUN curl -fsSL -o /tmp/sdk.zip "${CIQ_DOWNLOADS}/sdks/${CIQ_SDK_FILE}" \
     && unzip -q /tmp/sdk.zip -d /opt/connectiq-sdk \
     && rm /tmp/sdk.zip \
     && chmod +x /opt/connectiq-sdk/bin/* \
-    && test "$(cat /opt/connectiq-sdk/bin/version.txt)" = "${CIQ_SDK_VERSION}"
+    && test "$(cat /opt/connectiq-sdk/bin/version.txt)" = "${CIQ_SDK_VERSION}" \
+    # monkeyc writes default.jungle into its own bin/, so the SDK must be writable by the dev user
+    && chown -R vscode:vscode /opt/connectiq-sdk
 
 # SDK Manager (GUI) - needed to sign in to Garmin and download device definitions
 RUN curl -fsSL -o /tmp/sdkmanager.zip "${CIQ_DOWNLOADS}/sdk-manager/connectiq-sdk-manager-linux.zip" \

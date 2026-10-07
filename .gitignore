@@ -7,3 +7,6 @@ bin/
 # Signing keys - never commit
 *.der
 *.pem
+
+# Python
+__pycache__/

@@ -17,3 +17,27 @@ On first use:
 `~/.Garmin` is bind-mounted from the host, so devices, login and the key survive container rebuilds.
 The simulator and SDK Manager display through the host's X11 socket (`/tmp/.X11-unix`), which also
 works under Wayland via XWayland.
+
+## Building
+
+The face targets the fēnix 8 Solar 47mm only. Build and run it from VS Code (*Monkey C: Run*), or:
+
+```sh
+monkeyc -f monkey.jungle -d fenix8solar47mm -o bin/DotRing.prg -y ~/.Garmin/developer_key.der -w -l 3
+connectiq &                                   # start the simulator
+monkeydo bin/DotRing.prg fenix8solar47mm
+```
+
+Unit tests (ring fill, 12 and 24 hour times, weekdays, temperatures):
+
+```sh
+monkeyc -f monkey.jungle -d fenix8solar47mm -o bin/test.prg -y ~/.Garmin/developer_key.der --unit-test
+monkeydo bin/test.prg fenix8solar47mm -t
+```
+
+The dots and icons are one generated bitmap font, so `setColor` can tint them. Edit the icons in
+`tools/make_glyphs.py`, then regenerate `resources/fonts/glyphs.{fnt,png}`:
+
+```sh
+python3 tools/make_glyphs.py --preview /tmp/icons.png
+```
