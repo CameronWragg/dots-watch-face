@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Launch the Connect IQ SDK Manager with a session bus and an unlocked keyring,
+# so the Garmin sign-in (stored via libsecret) works inside the container.
+set -euo pipefail
+
+exec dbus-run-session -- bash -c '
+    echo -n "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+    exec /opt/connectiq-sdk-manager/bin/sdkmanager "$@"
+' _ "$@"

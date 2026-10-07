@@ -1,0 +1,9 @@
+# Build output
+bin/
+*.prg
+*.iq
+*.prg.debug.xml
+
+# Signing keys - never commit
+*.der
+*.pem

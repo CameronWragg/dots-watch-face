@@ -1,0 +1,38 @@
+{
+  "name": "Connect IQ",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "remoteUser": "vscode",
+
+  // ~/.Garmin holds device definitions, SDK Manager login and the developer key.
+  // It's bind-mounted from the host so it survives container rebuilds.
+  // xhost is optional: it grants the container's user access to the host X server.
+  "initializeCommand": "mkdir -p \"$HOME/.Garmin\" && (command -v xhost >/dev/null && xhost +si:localuser:$(id -un) >/dev/null || true)",
+
+  "mounts": [
+    "source=${localEnv:HOME}/.Garmin,target=/home/vscode/.Garmin,type=bind",
+    // X11 socket so the simulator and SDK Manager windows show on the host
+    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind"
+  ],
+  "runArgs": [
+    // Shared memory for X11 (MIT-SHM); avoids rendering glitches in the simulator
+    "--ipc=host"
+  ],
+  "containerEnv": {
+    "DISPLAY": "${localEnv:DISPLAY::0}"
+  },
+
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "garmin.monkey-c"
+      ],
+      "settings": {
+        "monkeyC.developerKeyPath": "/home/vscode/.Garmin/developer_key.der"
+      }
+    }
+  }
+}
