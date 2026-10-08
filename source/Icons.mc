@@ -7,7 +7,9 @@ module Icons {
 
     const SIZE = 16;
 
-    // Ring data points, then weather conditions.
+    const STATUS_SIZE = 10;
+
+    // Ring data points, weather conditions, then status indicators.
     const BATTERY = 0;
     const HEART = 1;
     const FOOTPRINTS = 2;
@@ -26,9 +28,14 @@ module Icons {
     const SNOW = 15;
     const THUNDERSTORM = 16;
     const FOG = 17;
+    const NOTIFICATIONS = 18;
+    const PHONE_DISCONNECTED = 19;
+    const ALARM = 20;
+    const DO_NOT_DISTURB = 21;
+    const COUNT = 22;
 
     // Start of each icon's rectangles in RECTS, then the end of the last icon's.
-    const STARTS = [0, 7, 25, 49, 63, 83, 96, 107, 113, 130, 141, 153, 162, 182, 199, 217, 235, 257, 260] as Array<Number>;
+    const STARTS = [0, 7, 25, 49, 63, 83, 96, 107, 113, 130, 141, 153, 162, 182, 199, 217, 235, 257, 260, 264, 278, 296, 304] as Array<Number>;
 
     // One rectangle per entry: x | y << 4 | (width - 1) << 8 | (height - 1) << 12.
     const RECTS = [
@@ -66,6 +73,12 @@ module Icons {
         0x0171, 0x017d, 0x0182, 0x018c, 0x0493, 0x0399, 0x01a8, 0x01b7, 0x03c6, 0x00d8,
         0x01e7, 0x01f6,
         0x1d41, 0x0983, 0x1db1,  // fog
+        0x2313, 0x2542, 0x0771, 0x0194,  // notifications
+        0x0000, 0x0403, 0x0011, 0x4017, 0x0022, 0x0033, 0x4042, 0x0044, 0x0055, 0x0066,  // phone_disconnected
+        0x0077, 0x0088, 0x0492, 0x0099,
+        0x0002, 0x0007, 0x0011, 0x0114, 0x0018, 0x0020, 0x0522, 0x0029, 0x0131, 0x0137,  // alarm
+        0x2041, 0x0144, 0x2048, 0x0254, 0x0171, 0x0177, 0x0582, 0x0393,
+        0x0104, 0x0512, 0x1721, 0x1140, 0x1148, 0x1761, 0x0582, 0x0194,  // do_not_disturb
     ] as Array<Number>;
 
     // Draws an icon in the current colour with its top-left pixel at (left, top).

@@ -17,6 +17,7 @@ import sys
 import zlib
 
 ICON = 16
+STATUS_ICON = 10
 STROKE = 1.6
 SUPERSAMPLE = 4
 THRESHOLD = 0.5
@@ -186,13 +187,25 @@ ICONS = {
                capsule(2, 12, 14, 12, STROKE / 2)),  # fog
 }
 
+# Status indicators on a 10 x 10 grid, shown below the weather while they apply.
+STATUS_ICONS = {
+    'NOTIFICATIONS': union(polygon([(5, 0.4), (7.2, 1.8), (7.6, 6.2), (9.6, 7.9), (0.4, 7.9), (2.4, 6.2), (2.8, 1.8)]),
+                           rbox(4, 8.6, 6, 9.8, 0.3)),  # bell
+    'PHONE_DISCONNECTED': union(minus(stroke(rbox(2.2, 0.6, 7.8, 9.4, 1.2), 1.1),
+                                      capsule(0.6, 0.6, 9.4, 9.4, 1.4)),
+                                capsule(0.6, 0.6, 9.4, 9.4, 0.55)),  # phone, struck through
+    'ALARM': union(stroke(circle(5, 5.6, 3.6), 1.2), capsule(5, 5.6, 5, 3.6, 0.55), capsule(5, 5.6, 6.4, 5.6, 0.55),
+                   capsule(0.8, 2.2, 2.2, 0.8, 0.7), capsule(9.2, 2.2, 7.8, 0.8, 0.7)),  # alarm clock
+    'DO_NOT_DISTURB': minus(circle(5, 5, 4.6), rbox(2, 4.2, 8, 5.8, 0.1)),  # no-entry sign
+}
 
-def rasterise(f):
+
+def rasterise(f, size=ICON):
     rows = []
     n = SUPERSAMPLE
-    for py in range(ICON):
+    for py in range(size):
         row = ''
-        for px in range(ICON):
+        for px in range(size):
             hits = sum(f(px + (i + 0.5) / n, py + (j + 0.5) / n) <= 0 for i in range(n) for j in range(n))
             row += '#' if hits / (n * n) >= THRESHOLD else '.'
         rows.append(row)
@@ -219,12 +232,13 @@ def rectangles(rows):
     """Covers an icon's pixels with rectangles: runs of pixels in a row, each merged
     with identical runs directly below it."""
     done, open_, rects = [], {}, []
-    for y, row in enumerate(rows + ['.' * ICON]):
+    size = len(rows)
+    for y, row in enumerate(rows + ['.' * size]):
         runs, x = [], 0
-        while x < ICON:
+        while x < size:
             if row[x] == '#':
                 w = 1
-                while x + w < ICON and row[x + w] == '#':
+                while x + w < size and row[x + w] == '#':
                     w += 1
                 runs.append((x, w))
                 x += w
@@ -251,8 +265,11 @@ module Icons {{
 
     const SIZE = {size};
 
-    // Ring data points, then weather conditions.
+    const STATUS_SIZE = {status_size};
+
+    // Ring data points, weather conditions, then status indicators.
 {names}
+    const COUNT = {count};
 
     // Start of each icon's rectangles in RECTS, then the end of the last icon's.
     const STARTS = [{starts}] as Array<Number>;
@@ -276,6 +293,7 @@ module Icons {{
 def main():
     root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
     icons = [(c, rasterise(f)) for c, f in ICONS.items()]
+    icons += [(c, rasterise(f, STATUS_ICON)) for c, f in STATUS_ICONS.items()]
 
     names, starts, lines, n = [], [], [], 0
     for i, (c, rows) in enumerate(icons):
@@ -289,7 +307,7 @@ def main():
     starts.append(n)
 
     with open(os.path.join(root, 'source', 'Icons.mc'), 'w') as f:
-        f.write(TEMPLATE.format(size=ICON, names='\n'.join(names), starts=', '.join(map(str, starts)),
+        f.write(TEMPLATE.format(size=ICON, status_size=STATUS_ICON, count=len(icons), names='\n'.join(names), starts=', '.join(map(str, starts)),
                                 rects='\n'.join(lines)))
 
     if '--preview' in sys.argv:
@@ -300,7 +318,7 @@ def main():
         for i, (c, rr) in enumerate(icons):
             for py in range(ICON * s):
                 for px in range(ICON * s):
-                    on = rr[py // s][px // s] == '#'
+                    on = py // s < len(rr) and px // s < len(rr) and rr[py // s][px // s] == '#'
                     v = 255 if on else (60 if (px % s == 0 or py % s == 0) else 0)
                     o = (i * cell + px) * 4
                     rows[py][o:o + 4] = [v, v, v, 255]

@@ -8,13 +8,12 @@ import Toybox.System;
 import Toybox.UserProfile;
 import Toybox.Weather;
 
-// One function per data point. Each returns a fraction from 0 to 1, or null when
-// the value is unavailable. fractions() reads the system once for all six segments.
+// The ring's data points, read once a minute: as fractions from 0 to 1 for the
+// bars, and as text for the centre line. Null wherever a value is unavailable.
 module DataSources {
 
     const DEFAULT_RESTING_HR = 50;
     const DEFAULT_MAX_HR = 190;
-    // timeToRecovery is in hours (the RECOVERY_TIME complication would be minutes).
     const RECOVERY_CAP_HOURS = 96;
 
     // Resting and maximum heart rate, read from the user profile by
@@ -28,63 +27,115 @@ module DataSources {
         var info = ActivityMonitor.getInfo();
         var out = new Array<Float?>[types.size()];
         for (var i = 0; i < types.size(); i++) {
-            out[i] = forData(types[i], stats, info);
+            out[i] = fraction(types[i], reading(types[i], stats, info), info);
         }
         return out;
     }
 
-    // The fraction for one complication type. Values come from the system APIs the
-    // face already uses where they exist; the Complications API covers the rest.
-    function forData(type as Number, stats as System.Stats, info as ActivityMonitor.Info) as Float? {
+    // A complication type's current reading as text, for the centre line: for
+    // example 87%, 64, 8432, 12H, or the sunset time. Null when unavailable.
+    function valueText(type as Number, is24Hour as Boolean) as String? {
+        var value = reading(type, System.getSystemStats(), ActivityMonitor.getInfo());
+        if (value == null) {
+            return null;
+        }
+        var whole = Math.round(value.toFloat()).toNumber();
         switch (type) {
-            case Complications.COMPLICATION_TYPE_BATTERY: return battery(stats);
+            case Complications.COMPLICATION_TYPE_BATTERY:
+            case Complications.COMPLICATION_TYPE_SOLAR_INPUT:
+            case Complications.COMPLICATION_TYPE_PULSE_OX:
+                return (whole < 0 ? 0 : whole) + "%";
+            case Complications.COMPLICATION_TYPE_RECOVERY_TIME:
+                return whole + "H";
+            case Complications.COMPLICATION_TYPE_SUNSET:
+                return timeOfDay(whole, is24Hour);
+        }
+        return whole.toString();
+    }
+
+    // Seconds since midnight as H:MM, in 12 or 24 hour time.
+    function timeOfDay(seconds as Number, is24Hour as Boolean) as String {
+        var hour = seconds / 3600 % 24;
+        if (!is24Hour) {
+            hour = hour % 12 == 0 ? 12 : hour % 12;
+        }
+        return hour + ":" + (seconds / 60 % 60).format("%02d");
+    }
+
+    // The raw reading behind a complication type, read straight from the system
+    // APIs the face already uses where they exist; the Complications API covers
+    // the rest. Units are the type's own: percent, bpm, steps, hours, seconds
+    // since midnight for Sunset, and so on.
+    function reading(type as Number, stats as System.Stats, info as ActivityMonitor.Info) as Numeric? {
+        switch (type) {
+            case Complications.COMPLICATION_TYPE_BATTERY: return stats.battery;
             case Complications.COMPLICATION_TYPE_HEART_RATE: return heartRate();
-            case Complications.COMPLICATION_TYPE_STEPS: return ratio(info.steps, info.stepGoal);
-            case Complications.COMPLICATION_TYPE_SOLAR_INPUT: return solarIntensity(stats);
+            case Complications.COMPLICATION_TYPE_STEPS: return info.steps;
+            case Complications.COMPLICATION_TYPE_SOLAR_INPUT: return stats.solarIntensity;
             case Complications.COMPLICATION_TYPE_BODY_BATTERY: return bodyBattery();
-            case Complications.COMPLICATION_TYPE_RECOVERY_TIME: return recovery(info);
+            // timeToRecovery is in hours (the RECOVERY_TIME complication would be minutes).
+            case Complications.COMPLICATION_TYPE_RECOVERY_TIME: return info.timeToRecovery;
             case Complications.COMPLICATION_TYPE_STRESS:
                 // The complication is the stress level Garmin's own faces show;
                 // stressScore averages only the last 30 seconds.
                 var stress = complication(Complications.COMPLICATION_TYPE_STRESS);
-                return percent(stress != null ? stress : info.stressScore);
-            case Complications.COMPLICATION_TYPE_FLOORS_CLIMBED: return ratio(info.floorsClimbed, info.floorsClimbedGoal);
+                return stress != null ? stress : info.stressScore;
+            case Complications.COMPLICATION_TYPE_FLOORS_CLIMBED: return info.floorsClimbed;
             case Complications.COMPLICATION_TYPE_INTENSITY_MINUTES:
                 var week = info.activeMinutesWeek;
-                return week != null ? ratio(week.total, info.activeMinutesWeekGoal) : null;
-            case Complications.COMPLICATION_TYPE_PULSE_OX: return percent(complication(Complications.COMPLICATION_TYPE_PULSE_OX));
-            case Complications.COMPLICATION_TYPE_SLEEP_SCORE: return percent(complication(Complications.COMPLICATION_TYPE_SLEEP_SCORE));
-            // Offered in the editor as Sunset.
-            case Complications.COMPLICATION_TYPE_SUNSET: return daylight();
+                return week != null ? week.total : null;
+            case Complications.COMPLICATION_TYPE_PULSE_OX:
+            case Complications.COMPLICATION_TYPE_SLEEP_SCORE:
+            case Complications.COMPLICATION_TYPE_SUNSET:
+                return complication(type as Complications.Type);
         }
         return null;
     }
 
-    function battery(stats as System.Stats) as Float? {
-        return clamp(stats.battery / 100.0);
+    // How full a reading's bar is.
+    function fraction(type as Number, value as Numeric?, info as ActivityMonitor.Info) as Float? {
+        if (value == null) {
+            return null;
+        }
+        switch (type) {
+            // Solar intensity is negative while the watch is not charging from the
+            // sun, which shows as empty.
+            case Complications.COMPLICATION_TYPE_BATTERY:
+            case Complications.COMPLICATION_TYPE_SOLAR_INPUT:
+            case Complications.COMPLICATION_TYPE_BODY_BATTERY:
+            case Complications.COMPLICATION_TYPE_STRESS:
+            case Complications.COMPLICATION_TYPE_PULSE_OX:
+            case Complications.COMPLICATION_TYPE_SLEEP_SCORE:
+                return percent(value);
+            case Complications.COMPLICATION_TYPE_HEART_RATE:
+                // From resting (empty) to maximum heart rate (full).
+                if (_hrRange == null) {
+                    refreshHeartRateRange();
+                }
+                var range = _hrRange as [Number, Number];
+                return clamp((value - range[0]).toFloat() / (range[1] - range[0]));
+            case Complications.COMPLICATION_TYPE_STEPS: return ratio(value, info.stepGoal);
+            case Complications.COMPLICATION_TYPE_FLOORS_CLIMBED: return ratio(value, info.floorsClimbedGoal);
+            case Complications.COMPLICATION_TYPE_INTENSITY_MINUTES: return ratio(value, info.activeMinutesWeekGoal);
+            // Fills in reverse, so a fuller bar means more ready.
+            case Complications.COMPLICATION_TYPE_RECOVERY_TIME:
+                return clamp(1.0 - value.toFloat() / RECOVERY_CAP_HOURS);
+            case Complications.COMPLICATION_TYPE_SUNSET: return daylight(value.toNumber());
+        }
+        return null;
     }
 
-    // Current heart rate between resting (empty) and maximum (full).
-    function heartRate() as Float? {
-        var hr = null;
+    // Current heart rate in bpm, from the activity or else the latest sample.
+    function heartRate() as Number? {
         var activity = Activity.getActivityInfo();
-        if (activity != null) {
-            hr = activity.currentHeartRate;
-        }
+        var hr = activity != null ? activity.currentHeartRate : null;
         if (hr == null) {
             var sample = ActivityMonitor.getHeartRateHistory(1, true).next();
             if (sample != null && sample.heartRate != ActivityMonitor.INVALID_HR_SAMPLE) {
                 hr = sample.heartRate;
             }
         }
-        if (hr == null) {
-            return null;
-        }
-        if (_hrRange == null) {
-            refreshHeartRateRange();
-        }
-        var range = _hrRange as [Number, Number];
-        return clamp((hr - range[0]).toFloat() / (range[1] - range[0]));
+        return hr;
     }
 
     // Rereads resting and maximum heart rate from the user profile. They change at
@@ -106,56 +157,33 @@ module DataSources {
     }
 
     // Progress towards a goal, such as steps against the step goal.
-    function ratio(value as Number?, goal as Number?) as Float? {
-        if (value == null || goal == null || goal <= 0) {
+    function ratio(value as Numeric, goal as Number?) as Float? {
+        if (goal == null || goal <= 0) {
             return null;
         }
         return clamp(value.toFloat() / goal);
     }
 
     // A value from 0 to 100, such as stress or sleep score.
-    function percent(value as Numeric?) as Float? {
-        return value != null ? clamp(value.toFloat() / 100.0) : null;
+    function percent(value as Numeric) as Float {
+        return clamp(value.toFloat() / 100.0);
     }
 
-    // Negative while the watch is not charging from the sun, which shows as empty.
-    function solarIntensity(stats as System.Stats) as Float? {
-        var solar = stats.solarIntensity;
-        if (solar == null) {
-            return null;
-        }
-        return clamp(solar / 100.0);
-    }
-
-    function bodyBattery() as Float? {
-        var history = SensorHistory.getBodyBatteryHistory({:period => 1, :order => SensorHistory.ORDER_NEWEST_FIRST});
-        var sample = history.next();
-        var level = sample != null ? sample.data : null;
-        if (level == null) {
-            return null;
-        }
-        return clamp(level / 100.0);
-    }
-
-    // Fills in reverse, so a fuller bar means more ready.
-    function recovery(info as ActivityMonitor.Info) as Float? {
-        var hours = info.timeToRecovery;
-        if (hours == null) {
-            return null;
-        }
-        return clamp(1.0 - hours.toFloat() / RECOVERY_CAP_HOURS);
+    // Latest Body Battery level, 0 to 100.
+    function bodyBattery() as Numeric? {
+        var sample = SensorHistory.getBodyBatteryHistory({:period => 1, :order => SensorHistory.ORDER_NEWEST_FIRST}).next();
+        return sample != null ? sample.data : null;
     }
 
     // How much of today's daylight is left: full at sunrise, empty from sunset until
-    // the next sunrise.
-    function daylight() as Float? {
+    // the next sunrise. Sunset is in seconds since midnight.
+    function daylight(sunset as Number) as Float? {
         var sunrise = complication(Complications.COMPLICATION_TYPE_SUNRISE);
-        var sunset = complication(Complications.COMPLICATION_TYPE_SUNSET);
-        if (sunrise == null || sunset == null) {
+        if (sunrise == null) {
             return null;
         }
         var clock = System.getClockTime();
-        return daylightLeft(clock.hour * 3600 + clock.min * 60 + clock.sec, sunrise.toNumber(), sunset.toNumber());
+        return daylightLeft(clock.hour * 3600 + clock.min * 60 + clock.sec, sunrise.toNumber(), sunset);
     }
 
     // Times are seconds since local midnight.

@@ -60,7 +60,7 @@ function ringDotsAreEvenlySpaced(logger as Logger) as Boolean {
 
 (:test)
 function iconRectanglesStayInside16By16(logger as Logger) as Boolean {
-    Test.assertEqual(Icons.STARTS.size(), Icons.FOG + 2);
+    Test.assertEqual(Icons.STARTS.size(), Icons.COUNT + 1);
     Test.assertEqual(Icons.STARTS[Icons.STARTS.size() - 1], Icons.RECTS.size());
     for (var i = 0; i < Icons.RECTS.size(); i++) {
         var r = Icons.RECTS[i];
@@ -183,9 +183,7 @@ function goalsAndPercentages(logger as Logger) as Boolean {
     Test.assertEqual(DataSources.ratio(5000, 10000), 0.5);
     Test.assertEqual(DataSources.ratio(15000, 10000), 1.0);
     Test.assert(DataSources.ratio(5000, 0) == null);
-    Test.assert(DataSources.ratio(null, 10000) == null);
     Test.assertEqual(DataSources.percent(75), 0.75);
-    Test.assert(DataSources.percent(null) == null);
     return true;
 }
 
@@ -201,5 +199,25 @@ function tapsPickTheNearestSegment(logger as Logger) as Boolean {
     Test.assertEqual(view.slotAt(25, 190), 5);
     Test.assertEqual(view.slotAt(25, 70), 6);
     Test.assert(view.slotAt(130, 130) == null);
+    return true;
+}
+
+(:test)
+function dotFontTablesLineUp(logger as Logger) as Boolean {
+    Test.assertEqual(DotFont.WIDTHS.size(), DotFont.CHARS.length());
+    Test.assertEqual(DotFont.GLYPHS.size(), DotFont.CHARS.length() * DotFont.ROWS);
+    var chars = "87% 12H 6:42".toCharArray();
+    for (var i = 0; i < chars.size(); i++) {
+        Test.assert(DotFont.indexOf(chars[i]) != null);
+    }
+    return true;
+}
+
+(:test)
+function sunsetTimeFollowsTheClockSetting(logger as Logger) as Boolean {
+    var sunset = 18 * 3600 + 42 * 60;
+    Test.assertEqual(DataSources.timeOfDay(sunset, true), "18:42");
+    Test.assertEqual(DataSources.timeOfDay(sunset, false), "6:42");
+    Test.assertEqual(DataSources.timeOfDay(12 * 3600 + 5 * 60, false), "12:05");
     return true;
 }

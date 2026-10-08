@@ -9,12 +9,22 @@ import Toybox.WatchUi;
 
 class DotRingView extends WatchUi.WatchFace {
 
-    // Tops of the text blocks, in display pixels.
+    // Tops of the text blocks, in display pixels. The centre line below the time
+    // shows the weather, or a segment's exact value after a touch and hold.
     private const DATE_TOP = 57;
     private const TIME_TOP = 103;
-    private const WEATHER_TOP = 176;
-    private const WEATHER_ICON_TOP = 182;
-    private const WEATHER_ICON_GAP = 6;
+    private const CENTRE_TOP = 176;
+    private const CENTRE_ICON_TOP = 182;
+    private const CENTRE_ICON_GAP = 6;
+    // The row of status icons, between the centre line and the bottom segment's icon.
+    private const STATUS_TOP = 207;
+    private const STATUS_GAP = 4;
+    // How long a segment's exact value stays on the centre line, in milliseconds.
+    private const VALUE_MS = 5000;
+
+    // Status icons in display order, with the bit each sets in statusBits().
+    private const STATUS_ICONS = [Icons.NOTIFICATIONS, Icons.PHONE_DISCONNECTED, Icons.ALARM, Icons.DO_NOT_DISTURB]
+        as Array<Number>;
 
     // Icon for each Weather.CONDITION_* code (0 to 53), or -1 for none.
     private const CONDITION_ICONS = [
@@ -48,11 +58,23 @@ class DotRingView extends WatchUi.WatchFace {
     private var _lit as Array<Number> = [-1, -1, -1, -1, -1, -1] as Array<Number>;
     private var _time as String? = null;
     private var _date as String? = null;
-    private var _weather as String? = null;
-    private var _weatherIcon as Number? = null;
-    // Areas covered by the date and weather, as [left, top, width, height].
+    private var _centreText as String? = null;
+    private var _centreIcon as Number? = null;
+    private var _centreIconColour as Number = 0;
+    private var _status as Number = -1;
+    // Areas covered by the date, centre line and status row, as [left, top, width, height].
     private var _dateBox as Array<Number>? = null;
-    private var _weatherBox as Array<Number>? = null;
+    private var _centreBox as Array<Number>? = null;
+    private var _statusBox as Array<Number>? = null;
+    // Left edge of the time's colon, which blinks while the watch is awake.
+    private var _colonX as Number = 0;
+
+    // Whether the watch is awake after a wrist raise, with onUpdate() every second.
+    private var _awake as Boolean = false;
+    // The segment whose exact value the centre line shows, or -1 for the weather,
+    // and when it was chosen (System.getTimer() milliseconds).
+    private var _shown as Number = -1;
+    private var _shownAt as Number = 0;
 
     // Whether the watch face editor started the face. The editor pulses the segment
     // being edited, drawn by a SegmentDrawable, so the face itself leaves it out.
@@ -104,6 +126,32 @@ class DotRingView extends WatchUi.WatchFace {
         return Graphics.createBufferedBitmap({:width => _width, :height => _height, :palette => palette});
     }
 
+    // Awake after a wrist raise: refresh straight away, so what the wearer sees is
+    // current, then blink the colon each second.
+    function onExitSleep() as Void {
+        _awake = true;
+        _minute = -1;
+    }
+
+    // Back to once a minute: steady colon, and the weather back on the centre line.
+    function onEnterSleep() as Void {
+        _awake = false;
+        if (_shown >= 0) {
+            _shown = -1;
+            _minute = -1;
+        }
+        WatchUi.requestUpdate();
+    }
+
+    // Shows a segment's exact value on the centre line for a few seconds, after a
+    // touch and hold on it. Takes the editor slot of the segment, as slotAt() returns.
+    function showValue(slot as Number) as Void {
+        _shown = slot - 1;
+        _shownAt = System.getTimer();
+        _minute = -1;
+        WatchUi.requestUpdate();
+    }
+
     function onUpdate(dc as Dc) as Void {
         var clock = System.getClockTime();
         if (_editMode) {
@@ -111,6 +159,10 @@ class DotRingView extends WatchUi.WatchFace {
             invalidate();
             refresh(dc, clock);
             return;
+        }
+        if (_shown >= 0 && System.getTimer() - _shownAt >= VALUE_MS) {
+            _shown = -1;
+            _minute = -1;
         }
         var minute = clock.hour * 60 + clock.min;
         var frame = _frame != null ? _frame.get() as Graphics.BufferedBitmap? : null;
@@ -128,6 +180,13 @@ class DotRingView extends WatchUi.WatchFace {
             _minute = minute;
         }
         dc.drawBitmap(0, 0, frame);
+
+        // The colon is off every other second while awake. Drawn over the copy on
+        // screen only, so the frame always holds it.
+        if (_awake && clock.sec % 2 == 1) {
+            dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
+            dc.fillRectangle(_colonX, TIME_TOP, DotFont.LARGE_SIZE, DotFont.height(true));
+        }
     }
 
     // Forgets what the frame shows, so the next refresh redraws all of it.
@@ -135,10 +194,12 @@ class DotRingView extends WatchUi.WatchFace {
         _minute = -1;
         _time = null;
         _date = null;
-        _weather = null;
-        _weatherIcon = null;
+        _centreText = null;
+        _centreIcon = null;
+        _status = -1;
         _dateBox = null;
-        _weatherBox = null;
+        _centreBox = null;
+        _statusBox = null;
         for (var s = 0; s < Ring.SEGMENTS; s++) {
             _lit[s] = -1;
         }
@@ -172,8 +233,10 @@ class DotRingView extends WatchUi.WatchFace {
             _date = date;
         }
 
-        var time = formatTime(clock.hour, clock.min, System.getDeviceSettings().is24Hour);
+        var settings = System.getDeviceSettings();
+        var time = formatTime(clock.hour, clock.min, settings.is24Hour);
         var timeLeft = _cx - DotFont.width(time, true) / 2;
+        _colonX = timeLeft + (DotFont.columns(time.substring(0, 2) as String) + 1) * DotFont.LARGE_PITCH;
         if (_time == null) {
             dc.setColor(Settings.accent, Graphics.COLOR_TRANSPARENT);
             DotFont.draw(dc, time, timeLeft, TIME_TOP, true);
@@ -183,7 +246,8 @@ class DotRingView extends WatchUi.WatchFace {
         }
         _time = time;
 
-        drawWeather(dc);
+        drawCentreLine(dc, settings);
+        drawStatus(dc, settings);
     }
 
     // Draws accent-coloured text centred on the display and returns the area it covers.
@@ -207,34 +271,82 @@ class DotRingView extends WatchUi.WatchFace {
         return formatDate(info.day_of_week as Number, info.day);
     }
 
-    // A condition icon, a gap, then the temperature, centred together. Without
-    // weather data, two dashes and no icon. Redrawn only when it changes.
-    private function drawWeather(dc as Dc) as Void {
-        var conditions = Weather.getCurrentConditions();
-        var temperature = DataSources.temperature(conditions);
-        var text = temperature == null ? "--"
-            : temperature.toString() + "°" + (DataSources.fahrenheit() ? "F" : "C");
-        var icon = temperature == null ? null : conditionIcon(DataSources.weatherCondition(conditions));
-        if (text.equals(_weather) && icon == _weatherIcon) {
+    // The centre line: an icon, a gap, then text, centred together. Normally the
+    // weather's condition icon and temperature, or two dashes and no icon without
+    // weather data; after a touch and hold, the segment's icon and exact value.
+    // Redrawn only when it changes.
+    private function drawCentreLine(dc as Dc, settings as System.DeviceSettings) as Void {
+        var text = null;
+        var icon = null;
+        var iconColour = Settings.accent;
+        if (_shown >= 0) {
+            text = DataSources.valueText(Settings.data[_shown], settings.is24Hour);
+            icon = Choices.ICONS[Settings.data[_shown]];
+            iconColour = Settings.colours[_shown];
+            if (text == null) {
+                text = "--";
+            }
+        } else {
+            var conditions = Weather.getCurrentConditions();
+            var temperature = DataSources.temperature(conditions);
+            if (temperature == null) {
+                text = "--";
+            } else {
+                text = temperature.toString() + "°" + (DataSources.fahrenheit() ? "F" : "C");
+                icon = conditionIcon(DataSources.weatherCondition(conditions));
+            }
+        }
+        if (text.equals(_centreText) && icon == _centreIcon && iconColour == _centreIconColour) {
             return;
         }
-        clearBox(dc, _weatherBox);
-        _weather = text;
-        _weatherIcon = icon;
+        clearBox(dc, _centreBox);
+        _centreText = text;
+        _centreIcon = icon;
+        _centreIconColour = iconColour;
         if (icon == null) {
-            _weatherBox = drawCentred(dc, text, WEATHER_TOP, false);
+            _centreBox = drawCentred(dc, text, CENTRE_TOP, false);
             return;
         }
-        var width = Icons.SIZE + WEATHER_ICON_GAP + DotFont.width(text, false);
+        var width = Icons.SIZE + CENTRE_ICON_GAP + DotFont.width(text, false);
         var left = _cx - width / 2;
+        dc.setColor(iconColour, Graphics.COLOR_TRANSPARENT);
+        Icons.draw(dc, icon, left, CENTRE_ICON_TOP);
         dc.setColor(Settings.accent, Graphics.COLOR_TRANSPARENT);
-        Icons.draw(dc, icon, left, WEATHER_ICON_TOP);
-        DotFont.draw(dc, text, left + Icons.SIZE + WEATHER_ICON_GAP, WEATHER_TOP, false);
+        DotFont.draw(dc, text, left + Icons.SIZE + CENTRE_ICON_GAP, CENTRE_TOP, false);
         // The 27 px text spans the 16 px icon's rows too (176 to 203 against 182 to 198).
-        _weatherBox = [left, WEATHER_TOP, width, DotFont.height(false)] as Array<Number>;
+        _centreBox = [left, CENTRE_TOP, width, DotFont.height(false)] as Array<Number>;
     }
 
-    // Watch face editor support
+    // The status icons that apply, centred in a row: unread notifications, phone
+    // not connected, an alarm set, Do Not Disturb. Redrawn only when they change.
+    private function drawStatus(dc as Dc, settings as System.DeviceSettings) as Void {
+        var bits = statusBits(settings);
+        if (bits == _status) {
+            return;
+        }
+        clearBox(dc, _statusBox);
+        _status = bits;
+        _statusBox = null;
+        var count = 0;
+        for (var i = 0; i < STATUS_ICONS.size(); i++) {
+            count += (bits >> i) & 1;
+        }
+        if (count == 0) {
+            return;
+        }
+        var width = count * Icons.STATUS_SIZE + (count - 1) * STATUS_GAP;
+        var x = _cx - width / 2;
+        _statusBox = [x, STATUS_TOP, width, Icons.STATUS_SIZE] as Array<Number>;
+        dc.setColor(Settings.accent, Graphics.COLOR_TRANSPARENT);
+        for (var i = 0; i < STATUS_ICONS.size(); i++) {
+            if ((bits >> i) & 1 == 1) {
+                Icons.draw(dc, STATUS_ICONS[i], x, STATUS_TOP);
+                x += Icons.STATUS_SIZE + STATUS_GAP;
+            }
+        }
+    }
+
+    // Touch and watch face editor support
 
     // Picks up a change made in the editor. While a complication is being chosen, the
     // editor pulses its segment, so the face stops drawing it.
@@ -277,8 +389,8 @@ class DotRingView extends WatchUi.WatchFace {
         return box;
     }
 
-    // The editor slot of the segment at a tapped point, or null when the tap is
-    // nowhere near the ring.
+    // The editor slot (segment number plus one) of the segment at a touched point,
+    // or null when the touch is nowhere near the ring.
     function slotAt(x as Number, y as Number) as Number? {
         var dx = x - _cx;
         var dy = _height / 2 - y;
@@ -319,6 +431,15 @@ function formatTime(hour as Number, minute as Number, is24Hour as Boolean) as St
 // dayOfWeek runs from 1 (Sunday) to 7, as Gregorian.info reports it.
 function formatDate(dayOfWeek as Number, day as Number) as String {
     return WEEKDAYS[dayOfWeek - 1] + " " + day.format("%02d");
+}
+
+// One bit per status icon, in DotRingView.STATUS_ICONS order: unread notifications,
+// phone not connected, an alarm set, Do Not Disturb.
+function statusBits(settings as System.DeviceSettings) as Number {
+    return (settings.notificationCount > 0 ? 1 : 0)
+        | (settings.phoneConnected ? 0 : 2)
+        | (settings.alarmCount > 0 ? 4 : 0)
+        | (settings.doNotDisturb ? 8 : 0);
 }
 
 // A segment drawn on its own, for the watch face editor to pulse while the wearer

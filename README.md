@@ -1,6 +1,11 @@
 # dots-watch-face
 A watch face made for Garmin devices formed with lots of little circles.
 
+The time, date and weather sit inside a ring of six dot segments, each a bar for one data point.
+Below the weather, small icons show unread notifications, a disconnected phone, a set alarm and
+Do Not Disturb. Touch and hold a segment to see its exact value in place of the weather for five
+seconds. While the watch is awake after a wrist raise, the time's colon blinks.
+
 ## Development
 
 Open the repo in the dev container (VS Code: *Dev Containers: Reopen in Container*). It ships with

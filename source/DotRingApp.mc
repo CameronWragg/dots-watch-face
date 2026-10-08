@@ -19,9 +19,6 @@ class DotRingApp extends Application.AppBase {
 
     function getInitialView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] {
         var view = new DotRingView(_editMode);
-        if (_editMode) {
-            return [view, new DotRingEditorDelegate(view)];
-        }
-        return [view];
+        return [view, new DotRingDelegate(view)];
     }
 }
