@@ -9,11 +9,11 @@ module DotFont {
     const ROWS = 7;
 
     // Characters with a glyph, in table order.
-    const CHARS = "0123456789CTUE:° ADFHIMNORSW-_%";
+    const CHARS = "0123456789CTUE:° ADFHIMNORSW-%";
 
     // Glyph widths in columns, in CHARS order.
     const WIDTHS = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 2, 2,
-        5, 5, 5, 5, 3, 5, 5, 5, 5, 5, 5, 3, 5, 5] as Array<Number>;
+        5, 5, 5, 5, 3, 5, 5, 5, 5, 5, 5, 3, 5] as Array<Number>;
 
     // 7 rows per glyph, in CHARS order. Each row is a bit mask with the leftmost
     // column in the highest of the glyph's width bits.
@@ -47,7 +47,6 @@ module DotFont {
         0x0f, 0x10, 0x10, 0x0e, 0x01, 0x01, 0x1e, // S
         0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0a, // W
         0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, // minus
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // blank digit cell, for 12 hour times before 10
         0x18, 0x19, 0x02, 0x04, 0x08, 0x13, 0x03, // percent
     ] as Array<Number>;
 

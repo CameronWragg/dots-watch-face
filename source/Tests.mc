@@ -74,7 +74,8 @@ function iconRectanglesStayInside16By16(logger as Logger) as Boolean {
 function timeBlockIs25ColumnsAnd198Pixels(logger as Logger) as Boolean {
     Test.assertEqual(DotFont.columns("10:09"), 25);
     Test.assertEqual(DotFont.width("10:09", true), 198);
-    Test.assertEqual(DotFont.columns("_9:41"), 25);
+    // In 12 hour mode a single-digit hour makes a narrower block, centred the same way.
+    Test.assertEqual(DotFont.columns("9:41"), 19);
     return true;
 }
 
@@ -89,11 +90,11 @@ function timeIn24HourMode(logger as Logger) as Boolean {
 (:test)
 function timeIn12HourMode(logger as Logger) as Boolean {
     Test.assertEqual(formatTime(0, 0, false), "12:00");
-    Test.assertEqual(formatTime(1, 7, false), "_1:07");
-    Test.assertEqual(formatTime(9, 59, false), "_9:59");
+    Test.assertEqual(formatTime(1, 7, false), "1:07");
+    Test.assertEqual(formatTime(9, 59, false), "9:59");
     Test.assertEqual(formatTime(10, 9, false), "10:09");
     Test.assertEqual(formatTime(12, 30, false), "12:30");
-    Test.assertEqual(formatTime(13, 0, false), "_1:00");
+    Test.assertEqual(formatTime(13, 0, false), "1:00");
     Test.assertEqual(formatTime(23, 15, false), "11:15");
     return true;
 }

@@ -62,7 +62,9 @@ class DotRingView extends WatchUi.WatchFace {
     private var _centreIcon as Number? = null;
     private var _centreIconColour as Number = 0;
     private var _status as Number = -1;
-    // Areas covered by the date, centre line and status row, as [left, top, width, height].
+    // Areas covered by the time, date, centre line and status row, as
+    // [left, top, width, height].
+    private var _timeBox as Array<Number>? = null;
     private var _dateBox as Array<Number>? = null;
     private var _centreBox as Array<Number>? = null;
     private var _statusBox as Array<Number>? = null;
@@ -197,6 +199,7 @@ class DotRingView extends WatchUi.WatchFace {
         _centreText = null;
         _centreIcon = null;
         _status = -1;
+        _timeBox = null;
         _dateBox = null;
         _centreBox = null;
         _statusBox = null;
@@ -234,20 +237,27 @@ class DotRingView extends WatchUi.WatchFace {
         }
 
         var settings = System.getDeviceSettings();
-        var time = formatTime(clock.hour, clock.min, settings.is24Hour);
-        var timeLeft = _cx - DotFont.width(time, true) / 2;
-        _colonX = timeLeft + (DotFont.columns(time.substring(0, 2) as String) + 1) * DotFont.LARGE_PITCH;
-        if (_time == null) {
-            dc.setColor(Settings.accent, Graphics.COLOR_TRANSPARENT);
-            DotFont.draw(dc, time, timeLeft, TIME_TOP, true);
-        } else {
-            // Every time string has the same glyph widths, so only changed digits move.
-            DotFont.redrawChanged(dc, _time, time, timeLeft, TIME_TOP, true, Settings.accent);
-        }
-        _time = time;
+        drawTime(dc, clock, settings.is24Hour);
 
         drawCentreLine(dc, settings);
         drawStatus(dc, settings);
+    }
+
+    // The time, centred.
+    private function drawTime(dc as Dc, clock as System.ClockTime, is24Hour as Boolean) as Void {
+        var time = formatTime(clock.hour, clock.min, is24Hour);
+        var oldTime = _time;
+        if (oldTime != null && oldTime.length() == time.length()) {
+            // Same number of digits, so the same glyph widths: only changed digits move.
+            DotFont.redrawChanged(dc, oldTime, time, (_timeBox as Array<Number>)[0], TIME_TOP, true, Settings.accent);
+        } else {
+            clearBox(dc, _timeBox);
+            _timeBox = drawCentred(dc, time, TIME_TOP, true);
+        }
+        _time = time;
+        var box = _timeBox as Array<Number>;
+        _colonX = box[0] + (DotFont.columns(time.substring(0, time.find(":") as Number) as String) + 1)
+            * DotFont.LARGE_PITCH;
     }
 
     // Draws accent-coloured text centred on the display and returns the area it covers.
@@ -414,15 +424,15 @@ class DotRingView extends WatchUi.WatchFace {
 
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as Array<String>;
 
-// HH:MM. In 24 hour mode the leading zero stays; in 12 hour mode hours 1 to 9
-// leave the first digit's cell empty, and there is no AM or PM marker.
+// HH:MM. In 24 hour mode the leading zero stays; in 12 hour mode hours 1 to 9 are
+// a single digit, and there is no AM or PM marker.
 function formatTime(hour as Number, minute as Number, is24Hour as Boolean) as String {
     var hours;
     if (is24Hour) {
         hours = hour.format("%02d");
     } else {
         hour = hour % 12 == 0 ? 12 : hour % 12;
-        hours = hour < 10 ? "_" + hour : hour.toString();
+        hours = hour.toString();
     }
     return hours + ":" + minute.format("%02d");
 }
