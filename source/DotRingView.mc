@@ -102,15 +102,16 @@ class DotRingView extends WatchUi.WatchFace {
         invalidate();
     }
 
-    // The watch face editor saves its settings while the face is not running, so
-    // check for changes whenever the face comes back, and redraw with a new frame
-    // for the new colours.
+    // Back to the face, perhaps from clearing notifications or from the watch face
+    // editor: refresh straight away, and if the editor changed the settings, redraw
+    // with a new frame for the new colours.
     function onShow() as Void {
         if (Settings.load() && _frame != null) {
             _frame = createFrame();
             invalidate();
-            WatchUi.requestUpdate();
         }
+        _minute = -1;
+        WatchUi.requestUpdate();
     }
 
     // A frame buffer whose palette holds only the colours the face uses, so it
@@ -164,6 +165,11 @@ class DotRingView extends WatchUi.WatchFace {
         }
         if (_shown >= 0 && System.getTimer() - _shownAt >= VALUE_MS) {
             _shown = -1;
+            _minute = -1;
+        }
+        // While awake, catch status changes, such as notifications cleared on the
+        // phone, within a second rather than at the next minute.
+        if (_awake && statusBits(System.getDeviceSettings()) != _status) {
             _minute = -1;
         }
         var minute = clock.hour * 60 + clock.min;
