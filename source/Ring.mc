@@ -18,9 +18,8 @@ module Ring {
     const UNLIT_COLOUR = 0x555555;
 
     const ICON_RADIUS = 100;
-
-    // Battery, heart rate, steps, solar intensity, Body Battery, recovery time.
-    const COLOURS = [0x00FF55, 0xFF0055, 0x00AAFF, 0xFFAA00, 0xAA55FF, 0xFFFF00] as Array<Number>;
+    // Taps closer to the centre than this select no segment in the watch face editor.
+    const TAP_RADIUS = 80;
 
     // Dot centres as a flat [x0, y0, x1, y1, ...] array: segment by segment, each
     // segment's dots in clockwise order. The whole-pixel positions come from
@@ -49,10 +48,9 @@ module Ring {
 
     // Brings a segment from `from` lit dots to `to`, redrawing only the dots whose
     // state changes. A `from` of -1 means nothing is drawn yet: all 13 dots and the
-    // segment's icon (Icons number `segment`) are drawn onto a black background.
+    // segment's icon (an Icons number) are drawn onto a black background.
     function drawSegment(dc as Graphics.Dc, dots as Array<Number>, icons as Array<Number>, segment as Number,
-            from as Number, to as Number) as Void {
-        var colour = COLOURS[segment];
+            colour as Number, icon as Number, from as Number, to as Number) as Void {
         var first = segment * DOTS_PER_SEGMENT * 2;
         var start = from < 0 ? 0 : (from < to ? from : to);
         var end = from < 0 ? DOTS_PER_SEGMENT : (from < to ? to : from);
@@ -81,7 +79,7 @@ module Ring {
 
         if (from < 0) {
             dc.setColor(colour, Graphics.COLOR_TRANSPARENT);
-            Icons.draw(dc, segment, icons[2 * segment], icons[2 * segment + 1]);
+            Icons.draw(dc, icon, icons[2 * segment], icons[2 * segment + 1]);
         }
     }
 

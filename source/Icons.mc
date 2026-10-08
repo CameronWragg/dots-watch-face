@@ -7,22 +7,28 @@ module Icons {
 
     const SIZE = 16;
 
-    // Ring segments, in segment order, then weather conditions.
+    // Ring data points, then weather conditions.
     const BATTERY = 0;
     const HEART = 1;
     const FOOTPRINTS = 2;
     const SUN = 3;
     const BOLT = 4;
     const GAUGE = 5;
-    const PARTLY_CLOUDY = 6;
-    const CLOUDY = 7;
-    const RAIN = 8;
-    const SNOW = 9;
-    const THUNDERSTORM = 10;
-    const FOG = 11;
+    const STRESS = 6;
+    const STAIRS = 7;
+    const STOPWATCH = 8;
+    const DROP = 9;
+    const MOON = 10;
+    const SUNRISE = 11;
+    const PARTLY_CLOUDY = 12;
+    const CLOUDY = 13;
+    const RAIN = 14;
+    const SNOW = 15;
+    const THUNDERSTORM = 16;
+    const FOG = 17;
 
     // Start of each icon's rectangles in RECTS, then the end of the last icon's.
-    const STARTS = [0, 7, 25, 49, 63, 83, 96, 116, 133, 151, 169, 191, 194] as Array<Number>;
+    const STARTS = [0, 7, 25, 49, 63, 83, 96, 107, 113, 130, 141, 153, 162, 182, 199, 217, 235, 257, 260] as Array<Number>;
 
     // One rectangle per entry: x | y << 4 | (width - 1) << 8 | (height - 1) << 12.
     const RECTS = [
@@ -38,6 +44,16 @@ module Icons {
         0x0582, 0x028b, 0x0791, 0x019b, 0x01a7, 0x01aa, 0x03b7, 0x02c7, 0x01d7, 0x02e6,
         0x0147, 0x0754, 0x0263, 0x026a, 0x0172, 0x037a, 0x0082, 0x0189, 0x008d, 0x2191,  // gauge
         0x1198, 0x219d, 0x01b7,
+        0x1135, 0x1354, 0x006b, 0x0074, 0x0077, 0x027a, 0x1480, 0x1187, 0x158a, 0x22a8,  // stress
+        0x00d9,
+        0x1529, 0x1049, 0x1465, 0x1085, 0x14a1, 0x20c1,  // stairs
+        0x2117, 0x0744, 0x0253, 0x025a, 0x0163, 0x016b, 0x4172, 0x0179, 0x417c, 0x0188,  // stopwatch
+        0x0197, 0x01c3, 0x01cb, 0x02d3, 0x02da, 0x07e4, 0x01f7,
+        0x1117, 0x0336, 0x1145, 0x1149, 0x1164, 0x116a, 0x4183, 0x418b, 0x02d4, 0x02d9,  // drop
+        0x05e5,
+        0x0026, 0x0234, 0x0243, 0x1352, 0x0471, 0x0581, 0x0691, 0x06a2, 0x0ab2, 0x08c3,  // moon
+        0x06d4, 0x02e6,
+        0x2157, 0x0181, 0x018d, 0x0192, 0x0197, 0x019c, 0x05a5, 0x17b4, 0x0fd0,  // sunrise
         0x2105, 0x0122, 0x0532, 0x0143, 0x0147, 0x1350, 0x0058, 0x0173, 0x0477, 0x0384,  // partly_cloudy
         0x028b, 0x0096, 0x019d, 0x01a5, 0x00ae, 0x10b5, 0x10bf, 0x01d5, 0x01de, 0x08e6,
         0x0235, 0x0643, 0x0153, 0x0358, 0x1162, 0x0469, 0x017c, 0x0281, 0x028c, 0x0191,  // cloudy

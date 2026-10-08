@@ -1,3 +1,4 @@
+import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Math;
 import Toybox.Test;
@@ -122,5 +123,83 @@ function temperatureBelowZeroAndInFahrenheit(logger as Logger) as Boolean {
     for (var i = 0; i < chars.size(); i++) {
         Test.assert(DotFont.indexOf(chars[i]) != null);
     }
+    return true;
+}
+
+(:test)
+function editorDefaultsAreValid(logger as Logger) as Boolean {
+    Test.assertEqual(Choices.DEFAULT_DATA.size(), Ring.SEGMENTS);
+    for (var s = 0; s < Ring.SEGMENTS; s++) {
+        Test.assert(Choices.ICONS[Choices.DEFAULT_DATA[s]] >= 0);
+    }
+    Test.assert(Choices.SCHEMES[Choices.DEFAULT_SCHEME] != null);
+    return true;
+}
+
+(:test)
+function everyOfferedComplicationHasAnIcon(logger as Logger) as Boolean {
+    var offered = 0;
+    for (var type = 0; type < Choices.ICONS.size(); type++) {
+        var icon = Choices.ICONS[type];
+        Test.assert(icon >= -1 && icon < Icons.STARTS.size() - 1);
+        if (icon >= 0) {
+            offered++;
+        }
+    }
+    Test.assertEqual(offered, 12);
+    return true;
+}
+
+(:test)
+function colourSchemesHaveSixColours(logger as Logger) as Boolean {
+    var singles = 0;
+    for (var i = 1; i < Choices.SCHEMES.size(); i++) {
+        var scheme = Choices.SCHEMES[i];
+        if (scheme == null) {
+            singles++;
+        } else {
+            Test.assertEqual(scheme.size(), Ring.SEGMENTS);
+        }
+    }
+    Test.assertEqual(singles, 1);
+    return true;
+}
+
+(:test)
+function daylightLeftDrainsFromSunriseToSunset(logger as Logger) as Boolean {
+    var sunrise = 6 * 3600;
+    var sunset = 18 * 3600;
+    Test.assertEqual(DataSources.daylightLeft(3 * 3600, sunrise, sunset), 0.0);
+    Test.assertEqual(DataSources.daylightLeft(sunrise, sunrise, sunset), 1.0);
+    Test.assertEqual(DataSources.daylightLeft(12 * 3600, sunrise, sunset), 0.5);
+    Test.assertEqual(DataSources.daylightLeft(sunset, sunrise, sunset), 0.0);
+    Test.assertEqual(DataSources.daylightLeft(23 * 3600, sunrise, sunset), 0.0);
+    Test.assert(DataSources.daylightLeft(12 * 3600, sunset, sunrise) == null);
+    return true;
+}
+
+(:test)
+function goalsAndPercentages(logger as Logger) as Boolean {
+    Test.assertEqual(DataSources.ratio(5000, 10000), 0.5);
+    Test.assertEqual(DataSources.ratio(15000, 10000), 1.0);
+    Test.assert(DataSources.ratio(5000, 0) == null);
+    Test.assert(DataSources.ratio(null, 10000) == null);
+    Test.assertEqual(DataSources.percent(75), 0.75);
+    Test.assert(DataSources.percent(null) == null);
+    return true;
+}
+
+(:test)
+function tapsPickTheNearestSegment(logger as Logger) as Boolean {
+    var view = new DotRingView(true);
+    var bmp = Graphics.createBufferedBitmap({:width => 260, :height => 260}).get() as Graphics.BufferedBitmap;
+    view.onLayout(bmp.getDc());
+    Test.assertEqual(view.slotAt(130, 10), 1);
+    Test.assertEqual(view.slotAt(235, 70), 2);
+    Test.assertEqual(view.slotAt(235, 190), 3);
+    Test.assertEqual(view.slotAt(130, 250), 4);
+    Test.assertEqual(view.slotAt(25, 190), 5);
+    Test.assertEqual(view.slotAt(25, 70), 6);
+    Test.assert(view.slotAt(130, 130) == null);
     return true;
 }

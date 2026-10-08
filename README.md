@@ -28,7 +28,8 @@ connectiq &                                   # start the simulator
 monkeydo bin/DotRing.prg fenix8solar47mm
 ```
 
-Unit tests (ring fill, 12 and 24 hour times, weekdays, temperatures):
+Unit tests (ring geometry and fill, icons, time and date formats, temperatures, data fractions,
+the editor's defaults and taps):
 
 ```sh
 monkeyc -f monkey.jungle -d fenix8solar47mm -o bin/test.prg -y ~/.Garmin/developer_key.der --unit-test
@@ -41,6 +42,16 @@ regenerate `source/Icons.mc`:
 
 ```sh
 python3 tools/make_icons.py --preview /tmp/icons.png
+```
+
+The face is customised in the watch's own watch face editor (Watch Face menu, Customise): a
+complication for each ring segment, a colour scheme (Style), the colour for the Single colour
+scheme (Data colour), and the colour of the time, date and weather (Accent colour). In the
+simulator, use File > Edit Watch Face. The choices are listed once in `tools/make_settings.py`,
+which generates `resources/configs/watchface.xml` and `source/Choices.mc`:
+
+```sh
+python3 tools/make_settings.py
 ```
 
 The ring's dot positions are snapped to whole pixels so that the gaps between dots, and their

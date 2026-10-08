@@ -65,6 +65,11 @@ def polygon(pts):
     return f
 
 
+def polyline(pts):
+    """Unsigned distance to an open path through pts."""
+    return lambda x, y: min(_seg_dist(x, y, *pts[i], *pts[i + 1]) for i in range(len(pts) - 1))
+
+
 def arc(cx, cy, r, a0, a1):
     """Arc of radius r from angle a0 to a1 degrees, clockwise from 12 o'clock."""
     def point(a):
@@ -152,14 +157,24 @@ def zigzag(x, y):
 
 
 ICONS = {
-    # Ring segments, in segment order
+    # Ring data points
     'BATTERY': union(stroke(rbox(1.0, 4.0, 11.0, 12.0, 1.0)), rbox(13.0, 6.0, 15.0, 10.0, 0.1)),  # battery
     'HEART': stroke(union(circle(5.3, 6.2, 3.3), circle(10.7, 6.2, 3.3),
-                      polygon([(2.25, 7.6), (8, 13.9), (13.75, 7.6), (8, 6)]))),  # heart
-    'FOOTPRINTS': union(stroke(ellipse(4.6, 5.6, 2.3, 3.7)), stroke(ellipse(11.4, 10.4, 2.3, 3.7))),  # footprints
+                      polygon([(2.25, 7.6), (8, 13.9), (13.75, 7.6), (8, 6)]))),  # heart rate
+    'FOOTPRINTS': union(stroke(ellipse(4.6, 5.6, 2.3, 3.7)), stroke(ellipse(11.4, 10.4, 2.3, 3.7))),  # steps
     'SUN': sun_shape(),  # sun (solar intensity, and clear weather)
     'BOLT': bolt(),  # Body Battery
-    'GAUGE': union(line(arc(8, 11.5, 6.3, 270, 90)), capsule(8, 11.5, 10.8, 7.3, STROKE / 2)),  # gauge
+    'GAUGE': union(line(arc(8, 11.5, 6.3, 270, 90)), capsule(8, 11.5, 10.8, 7.3, STROKE / 2)),  # recovery time
+    'STRESS': line(polyline([(1, 9), (4, 9), (6, 3.5), (9.5, 13), (11.5, 7), (13, 9), (15, 9)])),  # stress
+    'STAIRS': line(polyline([(1.5, 14), (1.5, 11), (5.5, 11), (5.5, 7), (9.5, 7), (9.5, 3), (14.5, 3)])),  # floors climbed
+    'STOPWATCH': union(stroke(circle(8, 9.5, 5.3)), capsule(8, 1.5, 8, 2.8, STROKE / 2),
+                       capsule(8, 9.5, 10.3, 7.2, STROKE / 2)),  # intensity minutes
+    'DROP': stroke(union(circle(8, 10.3, 4.2), polygon([(8, 1.5), (4.1, 9), (11.9, 9)]))),  # pulse ox
+    'MOON': minus(circle(7.5, 8.5, 6.2), circle(11.2, 5.8, 5.2)),  # sleep score
+    'SUNRISE': union(capsule(1, 13.5, 15, 13.5, STROKE / 2), minus(circle(8, 13.5, 4.2), lambda x, y: 13.5 - y),
+                     *[capsule(8 + 6.2 * math.sin(math.radians(a)), 13.5 - 6.2 * math.cos(math.radians(a)),
+                               8 + 8.2 * math.sin(math.radians(a)), 13.5 - 8.2 * math.cos(math.radians(a)), STROKE / 2)
+                       for a in (-50, 0, 50)]),  # daylight left (offered as Sunset)
     # Weather conditions
     'PARTLY_CLOUDY': union(minus(partial_sun(), lambda x, y: translate(scale(cloud_fill(), 0.75), 2.4, 2.2)(x, y) - 1.3),
                translate(scale(cloud(), 0.75), 2.4, 2.2)),  # partly cloudy
@@ -170,6 +185,7 @@ ICONS = {
     'FOG': union(capsule(2, 5, 14, 5, STROKE / 2), capsule(4, 8.5, 12, 8.5, STROKE / 2),
                capsule(2, 12, 14, 12, STROKE / 2)),  # fog
 }
+
 
 def rasterise(f):
     rows = []
@@ -235,7 +251,7 @@ module Icons {{
 
     const SIZE = {size};
 
-    // Ring segments, in segment order, then weather conditions.
+    // Ring data points, then weather conditions.
 {names}
 
     // Start of each icon's rectangles in RECTS, then the end of the last icon's.
